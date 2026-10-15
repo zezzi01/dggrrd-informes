@@ -13,7 +13,7 @@ const label=(r,k)=>{const v=val(r,k),f=app.fields.find(f=>f.name===k);return f?.
 function status(s,err=false){$("loginStatus").textContent=s;$("loginStatus").className="status "+(err?"error":"success")}
 function loadSDK(){return new Promise((resolve,reject)=>{if(!window.require)return reject(Error("No se cargó ArcGIS Maps SDK."));window.require(["esri/identity/OAuthInfo","esri/identity/IdentityManager","esri/request"],(OAuthInfo,IdentityManager,request)=>resolve({OAuthInfo,IdentityManager,request}),reject)})}
 async function connect(){
- const id=$("clientId").value.trim();if(!id)return status("Ingresá el Client ID de la aplicación OAuth.",true);
+ const id=$("clientId").value.trim();if(id)sessionStorage.setItem("dggrrd_arcgis_clientid",id);if(!id)return status("Ingresá el Client ID de la aplicación OAuth.",true);
  $("connectBtn").disabled=true;
  try {
    const sdk=await loadSDK();
@@ -118,3 +118,4 @@ async function word(){
 document.querySelectorAll('input[name="mode"]').forEach(r=>r.addEventListener("change",()=>{const m=document.querySelector('input[name="mode"]:checked').value==="mensual";$("monthlyRange").hidden=!m;$("periodRange").hidden=m}));
 $("connectBtn").addEventListener("click",connect);$("loadBtn").addEventListener("click",fetchData);$("pdfBtn").addEventListener("click",pdf);$("wordBtn").addEventListener("click",word);
 const script=document.createElement("script");script.src="https://cdn.jsdelivr.net/npm/docx@8.5.0/build/index.umd.js";document.head.appendChild(script);
+const storedClientId=sessionStorage.getItem("dggrrd_arcgis_clientid");if(storedClientId){$("clientId").value=storedClientId;connect()}
