@@ -86,8 +86,10 @@ function table(headers, rows) {
     '<w:'+x+' w:val="single" w:sz="4" w:color="A4B6AA"/>').join('');
   const row = (values,head=false) => '<w:tr>'+values.map(x=>cell(x,head)).join('')+'</w:tr>';
   const validRows = rows.length ? rows : [headers.map((_,i)=>i===0?'Sin registros':'—')];
+  const gridWidth=Math.max(800,Math.floor(10100/headers.length));
+  const grid='<w:tblGrid>'+headers.map(()=>'<w:gridCol w:w="'+gridWidth+'"/>').join('')+'</w:tblGrid>';
   return '<w:tbl><w:tblPr><w:tblW w:type="pct" w:w="5000"/><w:tblBorders>'+
-    borders+'</w:tblBorders></w:tblPr>'+row(headers,true)+validRows.map(r=>row(r)).join('')+'</w:tbl>';
+    borders+'</w:tblBorders></w:tblPr>'+grid+row(headers,true)+validRows.map(r=>row(r)).join('')+'</w:tbl>';
 }
 function logoRun(pixelWidth,pixelHeight) {
   const widthEmu = 250 * 9525;
