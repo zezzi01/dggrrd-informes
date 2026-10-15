@@ -11,7 +11,20 @@ const selected=k=>$(k).value;
 const formatDate=v=>{const d=new Date(v);return Number.isFinite(d.valueOf())?d.toLocaleDateString("es-PY",{timeZone:"America/Asuncion"}):"—"};
 const label=(r,k)=>{const v=val(r,k),f=app.fields.find(f=>f.name===k);return f?.domain?.codedValues?.find(o=>String(o.code)===String(v))?.name||String(v??"")};
 function status(s,err=false){$("loginStatus").textContent=s;$("loginStatus").className="status "+(err?"error":"success")}
-function loadSDK(){return new Promise((resolve,reject)=>{if(!window.require)return reject(Error("No se cargó ArcGIS Maps SDK."));window.require(["esri/identity/OAuthInfo","esri/identity/IdentityManager","esri/request"],(OAuthInfo,IdentityManager,request)=>resolve({OAuthInfo,IdentityManager,request}),reject)})}
+async function loadSDK(){
+  if (typeof window.$arcgis?.import !== "function") {
+    throw Error("No se pudo inicializar ArcGIS Maps SDK desde el CDN.");
+  }
+  const [OAuthInfo, IdentityManager, request] = await window.$arcgis.import([
+    "@arcgis/core/identity/OAuthInfo.js",
+    "@arcgis/core/identity/IdentityManager.js",
+    "@arcgis/core/request.js"
+  ]);
+  if (typeof IdentityManager?.registerOAuthInfos !== "function" || typeof IdentityManager?.getCredential !== "function") {
+    throw Error("No se pudo inicializar el administrador de identidad de ArcGIS.");
+  }
+  return {OAuthInfo,IdentityManager,request};
+}
 async function connect(){
  const id=$("clientId").value.trim();if(id)sessionStorage.setItem("dggrrd_arcgis_clientid",id);if(!id)return status("Ingresá el Client ID de la aplicación OAuth.",true);
  $("connectBtn").disabled=true;
