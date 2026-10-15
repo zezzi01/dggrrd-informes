@@ -7,7 +7,6 @@
   <meta name="description" content="Generador de informes de actividades DGGRRD conectado a ArcGIS Online">
   <title>Generador de Informes | DGGRRD</title>
   <link rel="stylesheet" href="./styles.css">
-  <script src="https://js.arcgis.com/4.34/"></script>
   <script type="module" src="./app.js"></script>
 </head>
 <body>
@@ -26,11 +25,10 @@
         <div class="headline"><div class="headline-left"><img src="./ESCUDO-MUNICIPAL-GRIS-01.png" class="municipal-logo" alt="Municipalidad de Asunción"><div><h1>Generador de informes</h1><p>Elaboración de informes mensuales y acumulados a partir de Survey123 y ArcGIS Online.</p></div></div><span class="pill" id="connectionBadge">Sin conexión</span></div>
         <div class="columns">
           <section class="panel config-panel">
-            <div class="section-head"><span class="section-no">01</span><div><h2>Conexión a ArcGIS</h2><p>Iniciá sesión con una cuenta autorizada para leer las capas.</p></div></div>
-            <label for="clientId">Client ID de la aplicación OAuth</label>
-            <div class="inline"><input id="clientId" type="text" autocomplete="off" placeholder="Pegá el Client ID de ArcGIS Online"><button class="btn secondary" id="connectBtn">Conectar</button></div>
-            <p class="helper">El Client ID es público; nunca ingreses aquí una contraseña, Client Secret ni token. El inicio de sesión se realiza en ArcGIS.</p>
-            <div id="loginStatus" class="status" role="status" aria-live="polite">Pendiente de autenticación.</div>
+            <div class="section-head"><span class="section-no">01</span><div><h2>Acceso a los datos</h2><p>Tu identidad municipal se valida al entrar. ArcGIS se consulta de forma segura desde el servidor.</p></div></div>
+            <div class="inline"><div><label>Usuario habilitado</label><strong id="userEmail">Verificando acceso…</strong></div><button class="btn secondary" id="connectBtn">Verificar</button></div>
+            <p class="helper">No necesitás una cuenta ArcGIS. Las credenciales de las capas no se muestran ni se guardan en este navegador.</p>
+            <div id="loginStatus" class="status" role="status" aria-live="polite">Verificando la conexión segura.</div>
             <div class="section-divider"></div>
             <div class="section-head"><span class="section-no">02</span><div><h2>Tipo de informe</h2><p>Elegí el período que querés consolidar.</p></div></div>
             <div class="mode"><label><input type="radio" name="mode" value="mensual" checked><span>Mensual</span></label><label><input type="radio" name="mode" value="acumulado"><span>Acumulado</span></label></div>
