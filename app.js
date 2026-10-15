@@ -1,7 +1,6 @@
 import { makeInstitutionalWord } from "./word-export.js";
-const BASE = "https://services7.arcgis.com/rMjPnBdK2qv90f42/arcgis/rest/services/service_03acd09013ba4976b3cc79e87c6a6689/FeatureServer";
 const $ = id => document.getElementById(id);
-const app = { request:null, meta:[], data:[], report:[], period:null, fields:[] };
+const app = { meta:[], data:[], report:[], period:null, fields:[] };
 const candidates={fDate:["fecha_heredada","fecha_actividad","fecha"],fCategory:["categoria"],fNeighborhood:["barrio_heredado","barrio"],fState:["estado"],fSite:["sitio_heredado","sitio","lugar"],fDescription:["descripcion","detalle"],fWaste:["residuos_kg","kg_residuos","peso_kg"],fService:["tipo_servicio","servicio_residuos"]};
 const safe=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const num=n=>new Intl.NumberFormat("es-PY",{maximumFractionDigits:2}).format(n||0);
@@ -12,33 +11,20 @@ const selected=k=>$(k).value;
 const formatDate=v=>{const d=new Date(v);return Number.isFinite(d.valueOf())?d.toLocaleDateString("es-PY",{timeZone:"America/Asuncion"}):"—"};
 const label=(r,k)=>{const v=val(r,k),f=app.fields.find(f=>f.name===k);return f?.domain?.codedValues?.find(o=>String(o.code)===String(v))?.name||String(v??"")};
 function status(s,err=false){$("loginStatus").textContent=s;$("loginStatus").className="status "+(err?"error":"success")}
-async function loadSDK(){
-  if (typeof window.$arcgis?.import !== "function") {
-    throw Error("No se pudo inicializar ArcGIS Maps SDK desde el CDN.");
-  }
-  const [OAuthInfo, IdentityManager, request] = await window.$arcgis.import([
-    "@arcgis/core/identity/OAuthInfo.js",
-    "@arcgis/core/identity/IdentityManager.js",
-    "@arcgis/core/request.js"
-  ]);
-  if (typeof IdentityManager?.registerOAuthInfos !== "function" || typeof IdentityManager?.getCredential !== "function") {
-    throw Error("No se pudo inicializar el administrador de identidad de ArcGIS.");
-  }
-  return {OAuthInfo,IdentityManager,request};
+async function api(payload){
+ const response=await fetch("/api/arcgis",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(payload),credentials:"same-origin"});
+ const body=await response.json().catch(()=>({}));
+ if(!response.ok)throw Error(body.error||"El servidor no pudo completar la consulta.");
+ return body;
 }
 async function connect(){
- const id=$("clientId").value.trim();if(id)sessionStorage.setItem("dggrrd_arcgis_clientid",id);if(!id)return status("Ingresá el Client ID de la aplicación OAuth.",true);
  $("connectBtn").disabled=true;
  try {
-   const sdk=await loadSDK();
-   sdk.IdentityManager.registerOAuthInfos([new sdk.OAuthInfo({appId:id,portalUrl:"https://www.arcgis.com",popup:false})]);
-   await sdk.IdentityManager.getCredential("https://www.arcgis.com/sharing");
-   app.request=sdk.request;
+   const session=await api({operation:"session"});
+   $("userEmail").textContent=session.email||"Usuario autenticado";
    app.meta=[];
    for(let i=0;i<2;i++){
-     const response=await sdk.request(BASE+"/"+i,{query:{f:"json"},responseType:"json"});
-     if(response.data.error)throw Error(response.data.error.message);
-     app.meta.push(response.data);
+     app.meta.push(await api({operation:"metadata",layer:i}));
    }
    app.fields=app.meta[1].fields||[];
    for(const [id,hints] of Object.entries(candidates)){
@@ -49,16 +35,15 @@ async function connect(){
    }
    $("loadBtn").disabled=false;$("connectionBadge").textContent="ArcGIS conectado";$("connectionBadge").classList.add("ready");
    status("Conexión correcta. Elegí el período y consultá las actividades.");
- } catch(e){status("No se pudo conectar: "+e.message+". Revisá el Client ID, las URLs de retorno OAuth y los permisos.",true)}
+ } catch(e){$("userEmail").textContent="Acceso no disponible";status("No se pudo conectar: "+e.message,true)}
  finally{$("connectBtn").disabled=false}
 }
-async function all(url,meta){
+async function all(layer,meta){
  const size=Math.min(meta.maxRecordCount||1000,1000),oid=meta.objectIdField||"OBJECTID";let offset=0,rows=[];
  for(let i=0;i<1000;i++){
-   const r=await app.request(url+"/query",{query:{f:"json",where:"1=1",outFields:"*",returnGeometry:false,resultOffset:offset,resultRecordCount:size,orderByFields:oid+" ASC"},responseType:"json"});
-   if(r.data.error)throw Error(r.data.error.message);
-   const part=r.data.features||[];rows.push(...part);offset+=part.length;
-   if(!part.length||part.length<size&&!r.data.exceededTransferLimit)break;
+   const r=await api({operation:"query",layer,resultOffset:offset,resultRecordCount:size,orderByFields:oid+" ASC"});
+   const part=r.features||[];rows.push(...part);offset+=part.length;
+   if(!part.length||part.length<size&&!r.exceededTransferLimit)break;
    if(i===999)throw Error("Se alcanzó el límite de resultados.");
  }
  return rows;
@@ -78,7 +63,7 @@ async function fetchData(){
  $("loadBtn").disabled=true;status("Consultando las capas de ArcGIS...");
  try{
   app.period=period();
-  app.data=await Promise.all([0,1].map(i=>all(BASE+"/"+i,app.meta[i])));
+  app.data=await Promise.all([0,1].map(i=>all(i,app.meta[i])));
   render();$("pdfBtn").disabled=false;$("wordBtn").disabled=false;
   status("Consulta finalizada; los indicadores y el informe están preparados.");
  }catch(e){status("Error de consulta: "+e.message,true)}
@@ -184,4 +169,4 @@ async function word() {
 document.querySelectorAll('input[name="mode"]').forEach(r=>r.addEventListener("change",()=>{const m=document.querySelector('input[name="mode"]:checked').value==="mensual";$("monthlyRange").hidden=!m;$("periodRange").hidden=m}));
 $("connectBtn").addEventListener("click",connect);$("loadBtn").addEventListener("click",fetchData);$("pdfBtn").addEventListener("click",pdf);$("wordBtn").addEventListener("click",word);
 
-const storedClientId=sessionStorage.getItem("dggrrd_arcgis_clientid");if(storedClientId){$("clientId").value=storedClientId;connect()}
+connect();
