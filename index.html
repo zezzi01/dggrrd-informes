@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#1d3032">
+  <meta name="description" content="Generador de informes de actividades DGGRRD conectado a ArcGIS Online">
+  <title>Generador de Informes | DGGRRD</title>
+  <link rel="stylesheet" href="./styles.css">
+  <script src="https://js.arcgis.com/4.34/"></script>
+  <script type="module" src="./app.js"></script>
+</head>
+<body>
+  <div class="shell">
+    <aside class="sidebar">
+      <div class="brand"><span class="brand-symbol">✦</span><div><strong>DGGRRD</strong><small>Municipalidad de Asunción</small></div></div>
+      <div class="nav-label">GESTIÓN DOCUMENTAL</div>
+      <div class="nav-item active"><span>▤</span> Generar informe</div>
+      <div class="nav-item"><span>▦</span> Actividades ArcGIS</div>
+      <div class="nav-foot"><span class="nav-dot"></span> Informes institucionales <small>Versión inicial · Generación local</small></div>
+    </aside>
+    <main class="main">
+      <header class="topbar"><span>Sistema de informes / DGGRRD</span><a href="https://github.com/zezzi01/dggrrd-informes" target="_blank" rel="noopener noreferrer">Repositorio GitHub ↗</a></header>
+      <div class="content">
+        <div class="eyebrow">DIRECCIÓN GENERAL DE GESTIÓN Y REDUCCIÓN DE RIESGOS DE DESASTRES</div>
+        <div class="headline"><div><h1>Generador de informes</h1><p>Elaboración de informes mensuales y acumulados a partir de Survey123 y ArcGIS Online.</p></div><span class="pill" id="connectionBadge">Sin conexión</span></div>
+        <div class="columns">
+          <section class="panel config-panel">
+            <div class="section-head"><span class="section-no">01</span><div><h2>Conexión a ArcGIS</h2><p>Iniciá sesión con una cuenta autorizada para leer las capas.</p></div></div>
+            <label for="clientId">Client ID de la aplicación OAuth</label>
+            <div class="inline"><input id="clientId" type="text" autocomplete="off" placeholder="Pegá el Client ID de ArcGIS Online"><button class="btn secondary" id="connectBtn">Conectar</button></div>
+            <p class="helper">El Client ID es público; nunca ingreses aquí una contraseña, Client Secret ni token. El inicio de sesión se realiza en ArcGIS.</p>
+            <div id="loginStatus" class="status" role="status" aria-live="polite">Pendiente de autenticación.</div>
+            <div class="section-divider"></div>
+            <div class="section-head"><span class="section-no">02</span><div><h2>Tipo de informe</h2><p>Elegí el período que querés consolidar.</p></div></div>
+            <div class="mode"><label><input type="radio" name="mode" value="mensual" checked><span>Mensual</span></label><label><input type="radio" name="mode" value="acumulado"><span>Acumulado</span></label></div>
+            <div id="monthlyRange"><label for="month">Mes del informe</label><input type="month" id="month" value="2026-10"></div>
+            <div id="periodRange" class="two-inputs" hidden><div><label for="start">Desde</label><input type="date" id="start" value="2026-01-01"></div><div><label for="end">Hasta</label><input type="date" id="end" value="2026-10-31"></div></div>
+            <button id="loadBtn" class="btn primary full" disabled>↻ Consultar registros</button>
+            <div class="section-divider"></div>
+            <div class="section-head"><span class="section-no">03</span><div><h2>Campos del informe</h2><p>Confirmá los campos detectados en tus capas.</p></div></div>
+            <div class="field-grid">
+              <div><label for="fDate">Fecha de intervención</label><select id="fDate" disabled></select></div>
+              <div><label for="fCategory">Categoría</label><select id="fCategory" disabled></select></div>
+              <div><label for="fNeighborhood">Barrio</label><select id="fNeighborhood" disabled></select></div>
+              <div><label for="fState">Estado</label><select id="fState" disabled></select></div>
+              <div><label for="fSite">Sitio / lugar</label><select id="fSite" disabled></select></div>
+              <div><label for="fDescription">Descripción</label><select id="fDescription" disabled></select></div>
+              <div><label for="fWaste">Residuos (kg)</label><select id="fWaste" disabled></select></div>
+              <div><label for="fService">Servicio de residuos</label><select id="fService" disabled></select></div>
+            </div>
+            <p class="helper">El cálculo de kilogramos se activa únicamente cuando se selecciona un campo medido en kg. No se suman cantidades sin unidad.</p>
+          </section>
+          <section class="panel results-panel">
+            <div class="section-head"><span class="section-no">04</span><div><h2>Resumen del período</h2><p id="periodCaption">Todavía no se consultaron registros.</p></div></div>
+            <div class="metrics">
+              <div class="metric"><span>Jornadas</span><strong id="nJornadas">—</strong><small>Registros generales</small></div>
+              <div class="metric"><span>Intervenciones</span><strong id="nIntervenciones">—</strong><small>Trabajos individuales</small></div>
+              <div class="metric"><span>Barrios</span><strong id="nBarrios">—</strong><small>Barrios identificados</small></div>
+              <div class="metric"><span>Residuos</span><strong id="nResiduos">—</strong><small>Kilogramos declarados</small></div>
+            </div>
+            <div class="data-head"><h3>Intervenciones por categoría</h3><span id="totalCount">Sin datos</span></div>
+            <div id="categoryBars" class="bars empty">Conectá ArcGIS y consultá un período para visualizar el desglose.</div>
+            <div class="data-head"><h3>Relación de intervenciones</h3><span id="detailCount"></span></div>
+            <div class="table-wrap"><table><thead><tr><th>Fecha</th><th>Categoría</th><th>Barrio</th><th>Estado</th></tr></thead><tbody id="rows"><tr><td colspan="4" class="empty-cell">Todavía no hay datos consultados.</td></tr></tbody></table></div>
+          </section>
+        </div>
+        <section class="panel export-panel">
+          <div class="section-head"><span class="section-no">05</span><div><h2>Preparar documento</h2><p>Los textos de observación y conclusiones se pueden revisar antes de exportar.</p></div></div>
+          <div class="export-layout">
+            <div><label for="conclusions">Conclusiones / observaciones del responsable</label><textarea id="conclusions" rows="4" placeholder="Escribí conclusiones verificadas o dejá este campo vacío."></textarea></div>
+            <div class="actions"><button class="btn secondary full" id="wordBtn" disabled>↓ Descargar Word (.docx)</button><button class="btn primary full" id="pdfBtn" disabled>↗ Abrir informe para PDF</button><small>PDF: se abre una versión imprimible para usar «Guardar como PDF». No se envían datos a otro servidor de informes.</small></div>
+          </div>
+        </section>
+        <footer>DGGRRD · Generador de informes · Los valores provienen de las capas autorizadas de ArcGIS Online. Validar antes de presentar oficialmente.</footer>
+      </div>
+    </main>
+  </div>
+</body>
+</html>
