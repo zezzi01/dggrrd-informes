@@ -1,3 +1,4 @@
+import { makeInstitutionalWord } from "./word-export.js";
 const BASE = "https://services7.arcgis.com/rMjPnBdK2qv90f42/arcgis/rest/services/service_03acd09013ba4976b3cc79e87c6a6689/FeatureServer";
 const $ = id => document.getElementById(id);
 const app = { request:null, meta:[], data:[], report:[], period:null, fields:[] };
@@ -133,116 +134,50 @@ function pdf(){
     win.document.close();
   }catch(e){status("Error al preparar PDF: "+e.message,true)}
 }
-let docxLoading=null;
-function ensureDocx(){
-  if(window.docx?.Document && window.docx?.Packer?.toBlob)return Promise.resolve(window.docx);
-  if(docxLoading)return docxLoading;
-  docxLoading=(async()=>{
-    const cdns=[
-      "https://cdn.jsdelivr.net/npm/docx@8.5.0/build/index.umd.min.js",
-      "https://unpkg.com/docx@8.5.0/build/index.umd.js"
-    ];
-    for(const url of cdns){
-      if(window.docx?.Document && window.docx?.Packer?.toBlob)return window.docx;
-      try{
-        await new Promise((resolve,reject)=>{
-          const script=document.createElement("script");
-          script.src=url;
-          script.onload=resolve;
-          script.onerror=()=>reject(new Error("No se pudo cargar el paquete Word"));
-          document.head.appendChild(script);
-        });
-        if(window.docx?.Document && window.docx?.Packer?.toBlob)return window.docx;
-      }catch(_error){}
-    }
-    throw Error("No se pudo cargar la biblioteca para crear Word. Comprobá tu conexión o los bloqueos del navegador.");
-  })().catch(e=>{docxLoading=null;throw e});
-  return docxLoading;
-}
-async function word(){
-  const button=$("wordBtn");
+
+async function word() {
+  const button=$("wordBtn"), previousLabel=button.textContent;
   button.disabled=true;
-  const labelOriginal=button.textContent;
   button.textContent="Preparando Word…";
-  try{
+  try {
     ensureReportReady();
-    const D=await ensureDocx();
     const s=summary();
-    const paragraph=t=>new D.Paragraph({text:String(t??""),spacing:{after:145}});
-    const heading=t=>new D.Paragraph({text:t,heading:D.HeadingLevel.HEADING_2,spacing:{before:280,after:100}});
-    const makeTable=(headers,rows)=>new D.Table({
-      width:{size:100,type:D.WidthType.PERCENTAGE},
-      rows:[
-        new D.TableRow({children:headers.map(t=>new D.TableCell({children:[paragraph(t)],shading:{fill:"EDEFEA"}}))}),
-        ...rows.map(row=>new D.TableRow({children:row.map(t=>new D.TableCell({children:[paragraph(t)]}))}))
-      ]
-    });
-    const content=[];
-    try{
-      const response=await fetch(MUNICIPAL_LOGO,{cache:"force-cache"});
-      if(!response.ok)throw Error("HTTP "+response.status);
-      const logo=new Uint8Array(await response.arrayBuffer());
-      content.push(new D.Paragraph({
-        children:[new D.ImageRun({data:logo,type:"png",transformation:{width:235,height:118}})],
-        alignment:D.AlignmentType.CENTER,
-        spacing:{after:80}
-      }));
-    }catch(err){
-      content.push(paragraph("Municipalidad de Asunción"));
-      status("Aviso: el logo no pudo insertarse en Word ("+err.message+"). Se generará el documento igualmente.",true);
-    }
-    content.push(
-      new D.Paragraph({text:"DIRECCIÓN GENERAL DE GESTIÓN Y REDUCCIÓN DE RIESGO DE DESASTRES",alignment:D.AlignmentType.CENTER,spacing:{after:150}}),
-      new D.Paragraph({text:"INFORME DE ACTIVIDADES DE LA DGGRRD",heading:D.HeadingLevel.HEADING_1,alignment:D.AlignmentType.CENTER}),
-      new D.Paragraph({text:"PERÍODO: "+app.period.name,alignment:D.AlignmentType.CENTER}),
-      heading("1. Objeto y alcance"),
-      paragraph("Consolidado de registros operativos correspondientes al período seleccionado. Los resultados provienen de ArcGIS Online y requieren validación institucional."),
-      heading("2. Síntesis ejecutiva"),
-      makeTable(["Indicador","Cantidad"],[
-        ["Jornadas",num(s.parents.length)],
-        ["Intervenciones",num(s.rows.length)],
-        ["Barrios identificados",num(s.barrios.size)],
-        ["Residuos (kg)",selected("fWaste")?num(s.waste):"No disponible"]
+    const model={
+      period:app.period.name,
+      jornadas:num(s.parents.length),
+      intervenciones:num(s.rows.length),
+      barrios:num(s.barrios.size),
+      residuos:selected("fWaste")?num(s.waste):"No disponible",
+      categorias:[...s.groups].map(([category,count])=>[category,num(count)]),
+      estados:[...s.states].map(([state,count])=>[state,num(count)]),
+      detalle:s.rows.map(row=>[
+        formatDate(val(row,selected("fDate"))),
+        label(row,selected("fCategory")),
+        label(row,selected("fNeighborhood")),
+        label(row,selected("fState")),
+        label(row,selected("fSite")),
+        label(row,selected("fDescription"))
       ]),
-      heading("3. Intervenciones por categoría"),
-      makeTable(["Categoría","Cantidad"],[...s.groups].map(([category,count])=>[category,num(count)])),
-      heading("4. Estados de ejecución"),
-      makeTable(["Estado","Cantidad"],[...s.states].map(([state,count])=>[state,num(count)])),
-      heading("5. Detalle de intervenciones"),
-      makeTable(["Fecha","Categoría","Barrio","Estado"],
-        s.rows.map(row=>[
-          formatDate(val(row,selected("fDate"))),
-          label(row,selected("fCategory")),
-          label(row,selected("fNeighborhood")),
-          label(row,selected("fState"))
-        ])
-      ),
-      heading("6. Gestión de residuos"),
-      paragraph(selected("fWaste")?num(s.waste)+" kg declarados; verificar unidad y pesajes.":"No se seleccionó un campo verificado en kg."),
-      heading("7. Conclusiones"),
-      paragraph($("conclusions").value||"Pendiente de validación por el área responsable."),
-      paragraph("Fuente: DGGRRD / Survey123 / ArcGIS Online. Generado el "+new Date().toLocaleDateString("es-PY"))
-    );
-    const doc=new D.Document({
-      creator:"DGGRRD - Municipalidad de Asunción",
-      title:"Informe de Actividades DGGRRD",
-      sections:[{children:content}]
-    });
-    const blob=await D.Packer.toBlob(doc);
+      notaResiduos:selected("fWaste")
+        ?num(s.waste)+" kg declarados. Verificar que el campo esté expresado en kilogramos y respaldado con comprobantes."
+        :"No se seleccionó un campo validado en kilogramos; no se calcula un total.",
+      conclusiones:$("conclusions").value
+    };
+    const blob=await makeInstitutionalWord(model,{logoUrl:MUNICIPAL_LOGO});
     const uri=URL.createObjectURL(blob);
-    const link=document.createElement("a");
-    link.href=uri;
-    link.download="DGGRRD_Informe_"+new Date().toISOString().slice(0,10)+".docx";
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    setTimeout(()=>URL.revokeObjectURL(uri),2000);
-    status("Informe Word preparado. Revisá la carpeta de descargas.");
-  }catch(e){
-    status("No se pudo generar Word: "+e.message,true);
-  }finally{
+    const anchor=document.createElement("a");
+    anchor.href=uri;
+    anchor.download="DGGRRD_Informe_"+new Date().toISOString().slice(0,10)+".docx";
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    setTimeout(()=>URL.revokeObjectURL(uri),10000);
+    status("Informe Word generado. Revisá las descargas del navegador.");
+  } catch(error) {
+    status("No se pudo generar Word: "+error.message,true);
+  } finally {
     button.disabled=false;
-    button.textContent=labelOriginal;
+    button.textContent=previousLabel;
   }
 }
 
